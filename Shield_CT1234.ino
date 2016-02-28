@@ -74,7 +74,7 @@ void setup()
 {
   uint8_t rxbuf[64];
   char msg[48];
-  int i = 0;
+  int i, retries = 10;
   Serial.begin(9600);
   Serial.println("EmonTX Shield CT1234 with SRF"); 
   Serial.println("OpenEnergyMonitor.org");
@@ -92,37 +92,41 @@ void setup()
 
   pinMode(LEDpin, OUTPUT);                                              // Setup indicator LED
   digitalWrite(LEDpin, HIGH);
-  delay(1000);
-  SRF.write((uint8_t *)"+++", 3);
-  delay(1000);
-  while(!SRF.available()) delay(10);
-  while(SRF.available()) {
-    rxbuf[i++] = SRF.read();
-  }
-  if ((i == 3) && rxbuf[0] == 'O' && rxbuf[1] == 'K') {
-    //Serial.println("Got OK back successfully");
-    SRF.write((uint8_t *)"ATMY\r", 5);
-    while(!SRF.available()) delay(10);
+  while(retries--) {
     i = 0;
+    delay(1000);
+    SRF.write((uint8_t *)"+++", 3);
+    delay(1000);
+    while(!SRF.available()) delay(10);
     while(SRF.available()) {
       rxbuf[i++] = SRF.read();
-      //Serial.write(rxbuf[i-1]);
-      //if (rxbuf[i-1] == '\r') Serial.write('\n');
     }
-    if ((i == 6) && rxbuf[3] == 'O' && rxbuf[4] == 'K') {
-      snprintf(msg, 48, "ATMY returned OK and set PANID to '%c%c'", rxbuf[0], rxbuf[1]);
-      Serial.println(msg);
-      PANID[0] = rxbuf[0];
-      PANID[1] = rxbuf[1];
+    if ((i == 3) && rxbuf[0] == 'O' && rxbuf[1] == 'K') {
+      //Serial.println("Got OK back successfully");
+      SRF.write((uint8_t *)"ATMY\r", 5);
+      while(!SRF.available()) delay(10);
+      i = 0;
+      while(SRF.available()) {
+        rxbuf[i++] = SRF.read();
+        //Serial.write(rxbuf[i-1]);
+        //if (rxbuf[i-1] == '\r') Serial.write('\n');
+      }
+      if ((i == 6) && rxbuf[3] == 'O' && rxbuf[4] == 'K') {
+        snprintf(msg, 48, "ATMY returned OK and set PANID to '%c%c'", rxbuf[0], rxbuf[1]);
+        Serial.println(msg);
+        PANID[0] = rxbuf[0];
+        PANID[1] = rxbuf[1];
+        retries = 0;
+      } else {
+        snprintf(msg, 48, "Got back i = %d", i);
+        Serial.println(msg);
+      }
     } else {
-      snprintf(msg, 48, "Got back i = %d", i);
+      snprintf(msg, 48, "Got back i = %d and response '%c' '%c'", i, rxbuf[0], rxbuf[1]);
       Serial.println(msg);
     }
-  } else {
-    snprintf(msg, 48, "Got back i = %d and response '%c' '%c'", i, rxbuf[0], rxbuf[1]);
-    Serial.println(msg);
+    SRF.write((uint8_t *)"ATDN\r", 5);
   }
-  SRF.write((uint8_t *)"ATDN\r", 5);
   
   sensors.begin();
   Serial.print("Found ");
