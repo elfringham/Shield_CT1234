@@ -28,7 +28,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define FILTERSETTLETIME 5000                                           //  Time (ms) to allow the filters to settle before sending data
+#define FILTERSETTLETIME 10000                                          //  Time (ms) to allow the filters to settle before sending data
 
 const int CT1 = 1; 
 const int CT2 = 0;                                                      // Set to 0 to disable 
@@ -74,7 +74,7 @@ void setup()
 {
   uint8_t rxbuf[64];
   char msg[48];
-  int i, retries = 10;
+  unsigned int i, retries = 10;
   Serial.begin(9600);
   Serial.println("EmonTX Shield CT1234 with SRF"); 
   Serial.println("OpenEnergyMonitor.org");
@@ -94,20 +94,30 @@ void setup()
   digitalWrite(LEDpin, HIGH);
   while(retries--) {
     i = 0;
-    delay(1000);
+    delay(1100);
     SRF.write((uint8_t *)"+++", 3);
     delay(1000);
-    while(!SRF.available()) delay(10);
+    while(!SRF.available() && i < 1000) {
+      delay(10);
+      i++;
+    }
+    i = 0;
     while(SRF.available()) {
-      rxbuf[i++] = SRF.read();
+      rxbuf[i % 64] = SRF.read();
+      i++;
     }
     if ((i == 3) && rxbuf[0] == 'O' && rxbuf[1] == 'K') {
       //Serial.println("Got OK back successfully");
       SRF.write((uint8_t *)"ATMY\r", 5);
-      while(!SRF.available()) delay(10);
+      i = 0;
+      while(!SRF.available() && i < 1000) {
+        delay(10);
+        i++;
+      }
       i = 0;
       while(SRF.available()) {
-        rxbuf[i++] = SRF.read();
+        rxbuf[i % 64] = SRF.read();
+        i++;
         //Serial.write(rxbuf[i-1]);
         //if (rxbuf[i-1] == '\r') Serial.write('\n');
       }
@@ -126,6 +136,12 @@ void setup()
       Serial.println(msg);
     }
     SRF.write((uint8_t *)"ATDN\r", 5);
+    delay(100);
+    i = 0;
+    while(SRF.available()) {
+      rxbuf[i % 64] = SRF.read();
+      i++;
+    }
   }
   
   sensors.begin();
@@ -144,26 +160,62 @@ void setup()
   Serial.println();
 }
 
+void check_SRF(void)
+{
+  uint8_t rxbuf[8];
+  unsigned int i = 0;
+  delay(100);
+  SRF.write((uint8_t *)"+++", 3);
+  delay(1000);
+  while(!SRF.available() && i < 1000) {
+    delay(10);
+    i++;
+  }
+  i = 0;
+  while(SRF.available()) {
+    rxbuf[i % 8] = SRF.read();
+    i++;
+  }
+  if ((i != 3) || rxbuf[0] != 'O' || rxbuf[1] != 'K') {
+    Serial.println("Could not get OK from SRF");
+  }
+  SRF.write((uint8_t *)"ATDN\r", 5);
+  i = 0;
+  while(!SRF.available() && i < 1000) {
+    delay(10);
+    i++;
+  }
+  i = 0;
+  while(SRF.available()) {
+    rxbuf[i % 8] = SRF.read();
+    i++;
+  }
+}
+
 int loop_count;
 
 void loop() 
 {
   if (CT1) {
+    Serial.print("CT1 ");
     emontx.power1 = ct1.calcIrms(1480) * 240.0;                         //ct.calcIrms(number of wavelengths sample)*AC RMS voltage
     Serial.print(emontx.power1);                                         
   }
   
   if (CT2) {
+    Serial.print("CT2 ");
     emontx.power2 = ct2.calcIrms(1480) * 240.0;
     Serial.print(" "); Serial.print(emontx.power2);
   } 
 
   if (CT3) {
+    Serial.print("CT3 ");
     emontx.power3 = ct3.calcIrms(1480) * 240.0;
     Serial.print(" "); Serial.print(emontx.power3);
   } 
   
    if (CT4) {
+    Serial.print("CT4 ");
     emontx.power4 = ct4.calcIrms(1480) * 240.0;
     Serial.print(" "); Serial.print(emontx.power4);
   } 
@@ -185,6 +237,7 @@ void loop()
     send_temp_data();
     digitalWrite(LEDpin, HIGH); delay(2); digitalWrite(LEDpin, LOW);      // flash LED
     delay(1000);                                                          // delay between readings in ms
+    check_SRF();
   }
 }
 

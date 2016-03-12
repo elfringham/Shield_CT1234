@@ -1,12 +1,19 @@
 void send_rf_data()
 {
   //Serial.println("Entering send_rf_data");
+  int i = 0;
   char msg[13];
   uint8_t recv;
   while (SRF.available()) {
     recv = SRF.read();
+    i++;
+    Serial.print(recv);
+    Serial.print(' ');
     //Serial.write(recv);
   }
+  Serial.println();
+  Serial.print("Received pwr ");
+  Serial.println(i);
   if (CT1) {
     snprintf(msg, 13, "a%c%cPWRA%05d", PANID[0], PANID[1], emontx.power1);
     //Serial.print(msg);
@@ -38,11 +45,17 @@ void send_temp_data()
 {
   char msg[13];
   uint8_t recv;
-  int rem;
+  int rem, i = 0;
   while (SRF.available()) {
     recv = SRF.read();
+    i++;
+    Serial.print(recv);
+    Serial.print(' ');
     //Serial.write(recv);
   }
+  Serial.println();
+  Serial.print("Received temp ");
+  Serial.println(i);
   rem = (int)((int)(emontx.temp * 10 + 0.5) % 10);
   snprintf(msg, 13, "a%c%cTEMP%03d.%d", PANID[0], PANID[1], (int)emontx.temp, abs(rem));
   //Serial.print(msg);
